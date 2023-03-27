@@ -2,6 +2,73 @@
 #include <stdio.h>
 #include <string.h>
 
+void putHigh(int arduinoPin);
+
+void putLow(int arduinoPin);
+
+void parseSetup(FILE* raw, FILE* baremetal);
+
+void parseLoop();
+
+void lex(FILE* raw, FILE* baremetal);
+
+
+int main(int argc, char const *argv[])
+{
+	FILE* raw = fopen("Arduino.ino", "r");
+	FILE* baremetal = fopen("Baremetal.ino", "r");
+
+	lex(raw, baremetal);
+
+	fclose(raw);
+	fclose(baremetal);
+
+	return 0;
+}
+
+void putHigh(int arduinoPin)
+{
+	// write 1 to the register bit corresponding to arduinoPin
+}
+
+void putLow(int arduinoPin)
+{
+	// write 1 to the register bit corresponding to arduinoPin
+}
+
+void parseSetup(FILE* raw, FILE* baremetal)
+{
+	fgetc(raw);
+	if(fgetc(raw) != '{')
+	{
+		printf("Could not find body of function\nsetup\n");
+		exit(1);
+	}
+
+	char command[100];
+	int len = 0;
+	char curr = fgetc(raw);
+	while(curr != '}')
+	{
+		if((curr == '(')) // function is complete, parameters follow
+		{
+			// pin number might be one or two digits long
+			char port[2];
+			port[0] = fgetc(raw);
+			char secondDigit = fgetc(raw);
+			if(secondDigit != ',')
+			{
+				port[1] = secondDigit;
+			}
+		}
+	}
+}
+
+void parseLoop()
+{
+	
+}
+
 void lex(FILE* raw, FILE* baremetal)
 {
 	/**
@@ -19,16 +86,16 @@ void lex(FILE* raw, FILE* baremetal)
 	{
 		if((curr == '(')) // function is complete, parameters follow
 		{
-			// analyze command
+			// analyze command[]
 			if(strcmp(command, "setup") == 0)
 			{
-
+				parseSetup(raw, baremetal);
 			}
 			else if(strcmp(command, "loop") == 0)
 			{
-
+				parseLoop(raw, baremetal);
 			}
-			else if(0)
+			else if(0) // only functions with no parameters
 			{
 				// follow previous conditions
 			}
@@ -55,27 +122,4 @@ void lex(FILE* raw, FILE* baremetal)
 		
 		curr = fgetc(raw);
 	}
-}
-
-void parseSetup()
-{
-
-}
-
-void parseLoop()
-{
-	
-}
-
-int main(int argc, char const *argv[])
-{
-	FILE* raw = fopen("Arduino.ino", "r");
-	FILE* baremetal = fopen("Baremetal.ino", "r");
-
-	lex(raw, baremetal);
-
-	fclose(raw);
-	fclose(baremetal);
-
-	return 0;
 }
