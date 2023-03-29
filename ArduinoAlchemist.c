@@ -1,10 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
-void putHigh(int arduinoPin);
+void setHigh(int arduinoPin);
 
-void putLow(int arduinoPin);
+void setLow(int arduinoPin);
 
 void parseSetup(FILE* raw, FILE* baremetal);
 
@@ -16,7 +17,7 @@ void lex(FILE* raw, FILE* baremetal);
 int main(int argc, char const *argv[])
 {
 	FILE* raw = fopen("Arduino.ino", "r");
-	FILE* baremetal = fopen("Baremetal.ino", "r");
+	FILE* baremetal = fopen("Baremetal.ino", "a");
 
 	lex(raw, baremetal);
 
@@ -26,19 +27,20 @@ int main(int argc, char const *argv[])
 	return 0;
 }
 
-void putHigh(int arduinoPin)
+void setHigh(int arduinoPin)
 {
 	// write 1 to the register bit corresponding to arduinoPin
 }
 
-void putLow(int arduinoPin)
+void setLow(int arduinoPin)
 {
 	// write 1 to the register bit corresponding to arduinoPin
 }
 
 void parseSetup(FILE* raw, FILE* baremetal)
 {
-	fgetc(raw);
+	fgetc(raw); // closing parenthesis
+	fgetc(raw); // newline character
 	if(fgetc(raw) != '{')
 	{
 		printf("Could not find body of function\nsetup\n");
@@ -53,14 +55,75 @@ void parseSetup(FILE* raw, FILE* baremetal)
 		if((curr == '(')) // function is complete, parameters follow
 		{
 			// pin number might be one or two digits long
-			char port[2];
+			char port[3];
 			port[0] = fgetc(raw);
 			char secondDigit = fgetc(raw);
 			if(secondDigit != ',')
 			{
 				port[1] = secondDigit;
 			}
+
+			int portNum = atoi(port);
+			fgets(command, 100, raw);
+
+			if(portNum < 8) // only allows setting port as input
+			{
+				fputs("\tvolatile uint8_t* pin", baremetal);
+				fputs(port, baremetal);
+
+				if(strstr(command, "OUTPUT") != NULL)
+				{
+					fputs(" = 0x2A|(1<<", baremetal);
+				}
+				else if(strstr(command, "INPUT") != NULL)
+				{
+					fputs(" = 0x2A&~(1<<", baremetal);
+				}
+
+				fputs(port, baremetal);
+				fputs(");\n", baremetal);
+			}
+			else if(portNum < 14)
+			{
+				fputs("\tvolatile uint8_t* pin", baremetal);
+				fputs(port, baremetal);
+
+				if(strstr(command, "OUTPUT") != NULL)
+				{
+					fputs(" = 0x24|(1<<", baremetal);
+				}
+				else if(strstr(command, "INPUT") != NULL)
+				{
+					fputs(" = 0x24&~(1<<", baremetal);
+				}
+
+				sprintf(port, "%d", portNum - 8);
+				fputs(port, baremetal);
+				fputs(");\n", baremetal);
+			}
+			else if(portNum < 20)
+			{
+				fputs("\tvolatile uint8_t* pin", baremetal);
+				fputs(port, baremetal);
+
+				if(strstr(command, "OUTPUT") != NULL)
+				{
+					fputs(" = 0x27|(1<<", baremetal);
+				}
+				else if(strstr(command, "INPUT") != NULL)
+				{
+					fputs(" = 0x27&~(1<<", baremetal);
+				}
+
+				sprintf(port, "%d", portNum - 13);
+				fputs(port, baremetal);
+				fputs(");\n", baremetal);
+			}
+
+			memset(command, '\n', sizeof(command));
 		}
+
+		curr = fgetc(raw);
 	}
 }
 
@@ -87,13 +150,16 @@ void lex(FILE* raw, FILE* baremetal)
 		if((curr == '(')) // function is complete, parameters follow
 		{
 			// analyze command[]
-			if(strcmp(command, "setup") == 0)
+			if(strstr(command, "setup") != NULL)
 			{
+				fputs("int main() {\n", baremetal);
 				parseSetup(raw, baremetal);
 			}
-			else if(strcmp(command, "loop") == 0)
+			else if(strstr(command, "loop") != NULL)
 			{
+				fputs("\n\twhile(1) {", baremetal);
 				parseLoop(raw, baremetal);
+				fputs("\n\t}\n\treturn 0;\n}", baremetal);
 			}
 			else if(0) // only functions with no parameters
 			{
