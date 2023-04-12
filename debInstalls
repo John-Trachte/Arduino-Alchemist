@@ -1,0 +1,4 @@
+# make this file runnable with: sudo chmod 771 debInstalls
+
+echo installing dependencies
+sudo apt install avr-libc avrdude gcc-avr binutils-avr -y
